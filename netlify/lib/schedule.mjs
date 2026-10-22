@@ -91,7 +91,7 @@ export function summaryContent(bookings) {
 export async function sendSummary(bookings) {
   const apiKey = env("RESEND_API_KEY");
   if (!apiKey) throw new Error("RESEND_API_KEY is not set in the Netlify environment variables.");
-  const to = env("NOTIFY_EMAIL") || "540144@umons.ac.be";
+  const to = env("NOTIFY_EMAIL") || "parry.dilara@gmail.com";
   const from = env("MAIL_FROM") || "Slot booking <onboarding@resend.dev>";
   const { subject, text, html } = summaryContent(bookings);
 
