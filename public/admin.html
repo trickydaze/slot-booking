@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slot bookings admin</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F2F4F7; --surface: #FFFFFF; --ink: #18212B; --muted: #5A6573;
+    --line: #D3D9E1; --line-strong: #B4BDC9; --pine: #1E5A47; --on-pine: #FFFFFF; --danger: #A3312B;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #10151B; --surface: #18202A; --ink: #E7ECF2; --muted: #9AA6B4;
+      --line: #2A3440; --line-strong: #3A4654; --pine: #7CC7A9; --on-pine: #0C241B; --danger: #F08C84;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: "Atkinson Hyperlegible Next", system-ui, sans-serif; line-height: 1.5; }
+  .wrap { max-width: 56rem; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
+  h1 { margin: 0 0 0.25rem; font-size: 2rem; font-weight: 800; letter-spacing: -0.02em; }
+  .sub { margin: 0 0 1.5rem; color: var(--muted); }
+  form { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: end; }
+  label { display: block; font-weight: 700; font-size: 0.9375rem; margin-bottom: 0.3rem; }
+  input { padding: 0.6rem 0.75rem; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; min-width: 16rem; }
+  .btn { padding: 0.6rem 1rem; border-radius: 6px; border: 1px solid var(--pine); background: var(--pine); color: var(--on-pine); font: inherit; font-weight: 700; cursor: pointer; }
+  .btn-line { background: transparent; color: var(--pine); }
+  .btn-danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+  .btn:focus-visible, input:focus-visible { outline: 3px solid var(--pine); outline-offset: 2px; }
+  .msg { margin: 1rem 0 0; font-weight: 600; }
+  .msg.err { color: var(--danger); }
+  .tools { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 2rem 0 1rem; align-items: center; }
+  .tools p { margin: 0 auto 0 0; color: var(--muted); }
+  .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+  th, td { text-align: left; padding: 0.6rem 0.9rem; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  td.time { font-weight: 700; font-variant-numeric: tabular-nums; }
+  td.free { color: var(--muted); }
+  td .btn { padding: 0.3rem 0.7rem; font-size: 0.875rem; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>Slot bookings</h1>
+  <p class="sub" id="sub">Enter the admin key set in Netlify to see who booked which slot.</p>
+
+  <form id="login">
+    <div>
+      <label for="key">Admin key</label>
+      <input id="key" type="password" autocomplete="current-password" required>
+    </div>
+    <button class="btn" type="submit">Show bookings</button>
+  </form>
+  <p class="msg" id="msg" role="status"></p>
+
+  <section id="panel" hidden>
+    <div class="tools">
+      <p id="summary"></p>
+      <button class="btn btn-line" type="button" id="email">Email the list now</button>
+      <button class="btn btn-danger" type="button" id="reset">Clear all bookings</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Time</th><th>Group</th><th>Name</th><th>Email</th><th>Booked at</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<script>
+  const $ = (s) => document.querySelector(s);
+  let key = "";
+  try { key = sessionStorage.getItem("slotAdminKey") || ""; } catch {}
+  if (key) $("#key").value = key;
+
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+  function say(text, isError = false) {
+    $("#msg").textContent = text;
+    $("#msg").className = isError ? "msg err" : "msg";
+  }
+
+  async function call(action, extra = {}) {
+    const res = await fetch("/api/admin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key, action, ...extra }),
+    });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(out.error || `Request failed (${res.status}).`);
+    return out;
+  }
+
+  async function load() {
+    const data = await call("list");
+    $("#panel").hidden = false;
+    $("#sub").textContent = data.dateLabel;
+    const sent = data.summarySentAt ? ` Summary email sent ${new Date(data.summarySentAt).toLocaleString()}.` : "";
+    $("#summary").textContent = `${data.bookings.length} of ${data.slotCount} slots booked.${sent}`;
+    const slotsRes = await fetch("/api/slots", { cache: "no-store" }).then((r) => r.json());
+    const byId = new Map(data.bookings.map((b) => [b.slotId, b]));
+    $("#rows").innerHTML = slotsRes.slots.map((s) => {
+      const b = byId.get(s.id);
+      const time = `<td class="time">${s.start}–${s.end}</td>`;
+      if (!b) return `<tr>${time}<td class="free" colspan="5">Free</td></tr>`;
+      return `<tr>${time}<td>${esc(b.group)}</td><td>${esc(b.firstName)} ${esc(b.lastName)}</td>` +
+        `<td><a href="mailto:${esc(b.email)}">${esc(b.email)}</a></td>` +
+        `<td>${new Date(b.bookedAt).toLocaleString()}</td>` +
+        `<td><button class="btn btn-line" type="button" data-release="${s.id}" data-label="${s.start}–${s.end}">Free slot</button></td></tr>`;
+    }).join("");
+  }
+
+  $("#login").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    key = $("#key").value.trim();
+    try { sessionStorage.setItem("slotAdminKey", key); } catch {}
+    say("");
+    try { await load(); } catch (err) { $("#panel").hidden = true; say(err.message, true); }
+  });
+
+  $("#rows").addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-release]");
+    if (!btn) return;
+    if (!confirm(`Free the ${btn.dataset.label} slot? The booking will be deleted and the slot opens again.`)) return;
+    try { await call("release", { slotId: Number(btn.dataset.release) }); say(`${btn.dataset.label} is free again.`); await load(); }
+    catch (err) { say(err.message, true); }
+  });
+
+  $("#email").addEventListener("click", async () => {
+    say("Sending…");
+    try { const out = await call("email"); say(out.message); } catch (err) { say(err.message, true); }
+  });
+
+  $("#reset").addEventListener("click", async () => {
+    if (!confirm("Delete every booking and reopen all slots? This can't be undone.")) return;
+    try { await call("reset"); say("All bookings cleared."); await load(); } catch (err) { say(err.message, true); }
+  });
+
+  if (key) load().catch((err) => say(err.message, true));
+</script>
+</body>
+</html>

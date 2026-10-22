@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Book your 1:1 slot</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F2F4F7;
+    --surface: #FFFFFF;
+    --ink: #18212B;
+    --muted: #5A6573;
+    --line: #D3D9E1;
+    --line-strong: #B4BDC9;
+    --pine: #1E5A47;
+    --pine-hover: #E1EEE8;
+    --on-pine: #FFFFFF;
+    --hatch: rgba(24, 33, 43, 0.07);
+    --danger: #A3312B;
+    --time-col: 4.75rem;
+    --rail-gap: 2rem;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #10151B;
+      --surface: #18202A;
+      --ink: #E7ECF2;
+      --muted: #9AA6B4;
+      --line: #2A3440;
+      --line-strong: #3A4654;
+      --pine: #7CC7A9;
+      --pine-hover: #17332A;
+      --on-pine: #0C241B;
+      --hatch: rgba(231, 236, 242, 0.06);
+      --danger: #F08C84;
+      color-scheme: dark;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, sans-serif;
+    font-size: 1.0625rem;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 40rem; margin: 0 auto; padding: 3.5rem 1rem 4rem; }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(2.75rem, 10vw, 4.5rem);
+    font-weight: 800;
+    line-height: 0.95;
+    letter-spacing: -0.025em;
+  }
+  h1 span { display: block; }
+  .lead { margin: 1.25rem 0 0; max-width: 34rem; color: var(--muted); }
+  .count { margin: 0.75rem 0 0; font-weight: 700; color: var(--pine); font-variant-numeric: tabular-nums; }
+
+  .notice {
+    margin: 2rem 0 0;
+    padding: 0.75rem 1rem;
+    border-left: 3px solid var(--danger);
+    background: var(--surface);
+    border-radius: 0 6px 6px 0;
+  }
+  .notice:empty { display: none; }
+
+  /* The time rail: slot height stands for 15 minutes, each gap for the 5-minute break. */
+  .rail { list-style: none; margin: 2.25rem 0 0; padding: 0; }
+  .gap { position: relative; height: 1.25rem; }
+  .gap::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--time-col) + var(--rail-gap) / 2 - 0.5px);
+    border-left: 1px dashed var(--line-strong);
+  }
+  .slot-btn::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(var(--time-col) + var(--rail-gap) / 2 - 1.5px);
+    width: 3px;
+    border-radius: 2px;
+    background: var(--pine);
+  }
+  .slot.is-taken .slot-btn::before { background: var(--line-strong); }
+  .slot.is-selected .slot-btn::before { background: var(--on-pine); opacity: 0.45; }
+
+  .slot-btn {
+    position: relative;
+    display: grid;
+    grid-template-columns: var(--time-col) 1fr auto;
+    column-gap: var(--rail-gap);
+    align-items: center;
+    width: 100%;
+    min-height: 3.75rem;
+    padding: 0 1rem 0 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+  .slot-btn:hover:not(:disabled) { background: var(--pine-hover); }
+  .slot-btn:focus-visible { outline: 3px solid var(--pine); outline-offset: 2px; }
+  .t-start {
+    justify-self: end;
+    font-size: 1.375rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+  .t-end { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .t-state { font-weight: 700; color: var(--pine); }
+
+  .slot.is-selected .slot-btn { background: var(--pine); color: var(--on-pine); }
+  .slot.is-selected .t-end, .slot.is-selected .t-state { color: var(--on-pine); }
+
+  .slot.is-taken .slot-btn {
+    cursor: not-allowed;
+    background: repeating-linear-gradient(135deg, transparent 0 7px, var(--hatch) 7px 8px);
+  }
+  .slot.is-taken .t-start, .slot.is-taken .t-end, .slot.is-taken .t-state { color: var(--muted); font-weight: 400; }
+  .slot.is-taken .t-start { font-weight: 600; }
+
+  /* Booking form, opened under the chosen slot */
+  .book-form {
+    position: relative;
+    z-index: 1;
+    margin: 0.75rem 0 1rem calc(var(--time-col) + var(--rail-gap));
+    padding: 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    animation: open 160ms ease-out;
+  }
+  @keyframes open { from { opacity: 0; transform: translateY(-4px); } }
+  @media (prefers-reduced-motion: reduce) { .book-form { animation: none; } }
+
+  .field { margin: 0 0 1rem; }
+  .field label { display: block; font-weight: 700; font-size: 0.9375rem; margin-bottom: 0.3rem; }
+  .hint { margin: -0.15rem 0 0.4rem; font-size: 0.9375rem; color: var(--muted); }
+  .names { display: grid; grid-template-columns: 1fr 1fr; gap: 0 0.875rem; }
+  input {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    background: var(--paper);
+    color: var(--ink);
+    font: inherit;
+  }
+  input:focus-visible { outline: 3px solid var(--pine); outline-offset: 0; border-color: var(--pine); }
+  input[aria-invalid="true"] { border-color: var(--danger); }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-top: 0.25rem; }
+  .btn {
+    padding: 0.7rem 1.15rem;
+    border-radius: 6px;
+    border: 1px solid var(--pine);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .btn-primary { background: var(--pine); color: var(--on-pine); }
+  .btn-primary:disabled { opacity: 0.6; cursor: progress; }
+  .btn-quiet { background: transparent; color: var(--pine); border-color: transparent; }
+  .btn:focus-visible { outline: 3px solid var(--pine); outline-offset: 2px; }
+  .form-error { margin: 0 0 1rem; color: var(--danger); font-weight: 600; }
+  .form-error:empty { display: none; }
+
+  .done { margin-top: 2.5rem; }
+  .done h2 { margin: 0; font-size: clamp(1.75rem, 6vw, 2.5rem); line-height: 1.05; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .done h2:focus { outline: none; }
+  .done p { margin: 0.75rem 0 1.25rem; max-width: 34rem; }
+
+  .status { margin: 2.25rem 0 0; color: var(--muted); }
+  .foot { margin: 3rem 0 0; padding-top: 1rem; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9375rem; }
+  .foot a { color: inherit; }
+
+  @media (max-width: 30rem) {
+    :root { --time-col: 3.9rem; --rail-gap: 1.5rem; }
+    .wrap { padding-top: 2.25rem; }
+    .t-start { font-size: 1.2rem; }
+    .book-form { margin-left: 0; }
+    .names { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <h1 id="date"><span>Thursday</span><span>17 December 2026</span></h1>
+    <p class="lead" id="lead">Book one 15-minute 1:1 slot.</p>
+    <p class="count" id="count" aria-live="polite"></p>
+  </header>
+
+  <section id="picker">
+    <p class="notice" id="notice" role="status"></p>
+    <p class="status" id="status">Loading slots…</p>
+    <ol class="rail" id="slots" aria-label="Slots"></ol>
+  </section>
+
+  <section class="done" id="done" hidden>
+    <h2 id="done-title" tabindex="-1"></h2>
+    <p id="done-text"></p>
+    <button type="button" class="btn btn-primary" id="ics">Add to calendar</button>
+  </section>
+
+  <p class="foot" id="contact" hidden></p>
+</main>
+
+<template id="form-tpl">
+  <form class="book-form" id="booking-form" novalidate>
+    <p class="form-error" role="alert"></p>
+    <div class="field">
+      <label for="f-group">Group number</label>
+      <p class="hint" id="f-group-hint">Your group number, not your challenge number.</p>
+      <input id="f-group" name="group" autocomplete="off" maxlength="20" required aria-describedby="f-group-hint">
+    </div>
+    <div class="names">
+      <div class="field">
+        <label for="f-first">First name</label>
+        <input id="f-first" name="firstName" autocomplete="given-name" maxlength="80" required>
+      </div>
+      <div class="field">
+        <label for="f-last">Last name</label>
+        <input id="f-last" name="lastName" autocomplete="family-name" maxlength="80" required>
+      </div>
+    </div>
+    <div class="field">
+      <label for="f-email">Email address</label>
+      <input id="f-email" name="email" type="email" autocomplete="email" maxlength="120" required>
+    </div>
+    <div class="actions">
+      <button type="submit" class="btn btn-primary"></button>
+      <button type="button" class="btn btn-quiet" data-cancel>Cancel</button>
+    </div>
+  </form>
+</template>
+
+<script>
+  // Page settings. Leave contactEmail empty ("") to hide the contact line.
+  const CONFIG = {
+    contactEmail: "540144@umons.ac.be",
+    refreshSeconds: 20,
+  };
+
+  const $ = (sel, el = document) => el.querySelector(sel);
+  const listEl = $("#slots");
+  const noticeEl = $("#notice");
+  const statusEl = $("#status");
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let data = null;
+  let selectedId = null;
+  let submitting = false;
+  let finished = false;
+  let lastBooking = null;
+  const form = $("#form-tpl").content.firstElementChild.cloneNode(true);
+
+  const range = (s) => `${s.start}–${s.end}`;
+  const slotById = (id) => data.slots.find((s) => s.id === id);
+  const liFor = (id) => listEl.querySelector(`li[data-id="${id}"]`);
+
+  if (CONFIG.contactEmail) {
+    const c = $("#contact");
+    c.innerHTML = `To change or cancel a booking, email <a href="mailto:${CONFIG.contactEmail}">${CONFIG.contactEmail}</a>.`;
+    c.hidden = false;
+  }
+
+  async function fetchSlots() {
+    const res = await fetch("/api/slots", { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  function renderHeader() {
+    const [weekday, ...rest] = data.dateLabel.split(" ");
+    $("#date").innerHTML = `<span>${weekday}</span><span>${rest.join(" ")}</span>`;
+    const first = data.slots[0];
+    const last = data.slots[data.slots.length - 1];
+    $("#lead").textContent =
+      `Book one ${data.slotMinutes}-minute 1:1 slot. Slots run from ${first.start} to ${last.end}, Brussels time, ` +
+      `with a ${data.breakMinutes}-minute break between them.`;
+  }
+
+  function buildList() {
+    listEl.innerHTML = "";
+    data.slots.forEach((s, i) => {
+      if (i > 0) {
+        const gap = document.createElement("li");
+        gap.className = "gap";
+        gap.setAttribute("aria-hidden", "true");
+        listEl.append(gap);
+      }
+      const li = document.createElement("li");
+      li.className = "slot";
+      li.dataset.id = s.id;
+      li.innerHTML =
+        `<button type="button" class="slot-btn" aria-expanded="false" aria-controls="booking-form">` +
+        `<span class="t-start">${s.start}</span><span class="t-end">until ${s.end}</span><span class="t-state"></span></button>`;
+      li.firstElementChild.addEventListener("click", () => toggle(s.id));
+      listEl.append(li);
+    });
+  }
+
+  function applyState() {
+    for (const s of data.slots) {
+      const li = liFor(s.id);
+      const btn = li.firstElementChild;
+      const selected = selectedId === s.id;
+      li.classList.toggle("is-taken", s.taken);
+      li.classList.toggle("is-selected", selected && !s.taken);
+      btn.disabled = s.taken;
+      btn.setAttribute("aria-expanded", String(selected && !s.taken));
+      btn.querySelector(".t-state").textContent = s.taken ? "Taken" : selected ? "Selected" : "Free";
+      btn.setAttribute("aria-label", `${s.start} to ${s.end}, ${s.taken ? "taken" : "free"}`);
+    }
+    const free = data.slots.filter((s) => !s.taken).length;
+    $("#count").textContent = free === 0
+      ? `All ${data.slots.length} slots are booked.`
+      : `${free} of ${data.slots.length} slots free`;
+  }
+
+  async function refresh() {
+    if (finished) return;
+    try {
+      const fresh = await fetchSlots();
+      const firstLoad = !data;
+      data = fresh;
+      if (firstLoad) {
+        renderHeader();
+        buildList();
+        statusEl.hidden = true;
+      }
+      if (selectedId && slotById(selectedId)?.taken && !submitting) {
+        const s = slotById(selectedId);
+        closeForm();
+        noticeEl.textContent = `${range(s)} was just booked by someone else. Pick another slot.`;
+      }
+      applyState();
+    } catch {
+      if (!data) {
+        statusEl.innerHTML = `Couldn't load the slots. Check your connection, then <button type="button" class="btn btn-quiet" id="retry">try again</button>`;
+        $("#retry").addEventListener("click", () => { statusEl.textContent = "Loading slots…"; refresh(); });
+      }
+    }
+  }
+
+  function toggle(id) {
+    if (submitting) return;
+    if (selectedId === id) return closeForm();
+    noticeEl.textContent = "";
+    selectedId = id;
+    const s = slotById(id);
+    liFor(id).append(form);
+    $(".form-error", form).textContent = "";
+    form.querySelectorAll("input").forEach((i) => i.removeAttribute("aria-invalid"));
+    $('button[type="submit"]', form).textContent = `Book ${range(s)}`;
+    applyState();
+    const firstEmpty = [...form.querySelectorAll("input")].find((i) => !i.value.trim());
+    (firstEmpty || $('button[type="submit"]', form)).focus({ preventScroll: true });
+    form.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
+  }
+
+  function closeForm() {
+    const id = selectedId;
+    selectedId = null;
+    form.remove();
+    applyState();
+    if (id) liFor(id)?.firstElementChild.focus({ preventScroll: true });
+  }
+
+  form.querySelector("[data-cancel]").addEventListener("click", closeForm);
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (submitting || !selectedId) return;
+    const errorEl = $(".form-error", form);
+    const fields = {
+      group: form.group, firstName: form.firstName, lastName: form.lastName, email: form.email,
+    };
+    const names = { group: "group number", firstName: "first name", lastName: "last name", email: "email address" };
+    const missing = [];
+    for (const [k, input] of Object.entries(fields)) {
+      const empty = !input.value.trim();
+      input.setAttribute("aria-invalid", String(empty));
+      if (empty) missing.push(k);
+    }
+    if (missing.length) {
+      errorEl.textContent = `Fill in your ${missing.map((k) => names[k]).join(", ")}.`;
+      fields[missing[0]].focus();
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(fields.email.value.trim())) {
+      fields.email.setAttribute("aria-invalid", "true");
+      errorEl.textContent = "Enter a valid email address.";
+      fields.email.focus();
+      return;
+    }
+
+    const submitBtn = $('button[type="submit"]', form);
+    const label = submitBtn.textContent;
+    submitting = true;
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Booking…";
+    errorEl.textContent = "";
+
+    try {
+      const res = await fetch("/api/book", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slotId: selectedId,
+          group: fields.group.value,
+          firstName: fields.firstName.value,
+          lastName: fields.lastName.value,
+          email: fields.email.value,
+        }),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (res.ok && out.ok) return showDone(out.booking);
+      if (out.code === "taken") {
+        submitting = false;
+        closeForm();
+        noticeEl.textContent = out.error;
+        await refresh();
+        noticeEl.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center" });
+        return;
+      }
+      errorEl.textContent = out.error || "The booking didn't go through. Try again.";
+    } catch {
+      errorEl.textContent = "Couldn't reach the booking server. Check your connection and try again.";
+    } finally {
+      submitting = false;
+      submitBtn.disabled = false;
+      submitBtn.textContent = label;
+    }
+  });
+
+  function showDone(b) {
+    finished = true;
+    lastBooking = b;
+    $("#picker").hidden = true;
+    $("#count").hidden = true;
+    $("#done-title").textContent = `Booked: ${b.start}–${b.end}`;
+    $("#done-text").textContent =
+      `${b.dateLabel}, for group ${b.group} (${b.firstName} ${b.lastName}). ` +
+      `No confirmation email is sent, so add it to your calendar or note it down.`;
+    $("#done").hidden = false;
+    $("#done-title").focus();
+    window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+  }
+
+  // Calendar file. Converts Brussels wall-clock time to UTC so any calendar app places it correctly.
+  function utcStamp(date, hhmm) {
+    const naive = new Date(`${date}T${hhmm}:00Z`);
+    const p = Object.fromEntries(
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+      }).formatToParts(naive).map((x) => [x.type, x.value])
+    );
+    const offset = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute) - naive.getTime();
+    return new Date(naive.getTime() - offset).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  }
+  const icsText = (s) => String(s).replace(/[\\;,]/g, (c) => "\\" + c).replace(/\n/g, "\\n");
+
+  $("#ics").addEventListener("click", () => {
+    const b = lastBooking;
+    const lines = [
+      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//slot-booking//EN", "CALSCALE:GREGORIAN",
+      "BEGIN:VEVENT",
+      `UID:slot-${b.slotId}-${b.date}@slot-booking`,
+      `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "")}`,
+      `DTSTART:${utcStamp(b.date, b.start)}`,
+      `DTEND:${utcStamp(b.date, b.end)}`,
+      `SUMMARY:${icsText(`1:1 slot, group ${b.group}`)}`,
+      "END:VEVENT", "END:VCALENDAR",
+    ];
+    const blob = new Blob([lines.join("\r\n") + "\r\n"], { type: "text/calendar" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `slot-${b.start.replace(":", "")}.ics`;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  refresh();
+  setInterval(() => { if (document.visibilityState === "visible") refresh(); }, CONFIG.refreshSeconds * 1000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refresh(); });
+</script>
+</body>
+</html>

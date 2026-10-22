@@ -1,0 +1,9 @@
+{
+  "name": "slot-booking",
+  "private": true,
+  "type": "module",
+  "description": "1:1 slot booking site for Netlify",
+  "dependencies": {
+    "@netlify/blobs": "^11.1.6"
+  }
+}
